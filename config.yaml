@@ -1,0 +1,53 @@
+# regional-scout configuration — copy to config.local.yaml for secrets
+
+openalex:
+  api_key: "YOUR_KEY_HERE"
+  max_credits_per_run: 50000
+  work_window_years: 5
+  max_candidates: 200
+  works_pages_estimate: 3
+  cache_path: ".cache/regional-scout/openalex.db"
+
+region:
+  country_codes: ["it"]
+  ror_ids: []
+
+scoring:
+  weights:
+    relevance: 0.35
+    productivity: 0.20
+    impact: 0.25
+    centrality: 0.15
+    wiley: 0.00
+  career_stage_boost: false
+  career_stage_boost_multiplier: 1.15
+  min_cited_by_count: 5
+  min_in_scope_works: 1
+  scope_author_prefilter: true   # authors must match scope topics/sources in window
+
+scope:
+  seed_dois:
+    - "10.1002/advs.202100344"
+  competitor_journals:
+    - issn: "2635-098X"   # Digital Discovery
+    - issn: "2522-5839"   # Nature Machine Intelligence
+  additional_topic_ids: []
+
+wiley_portfolio:
+  always_check: false
+  advanced_intelligent_systems: "S4210212817"
+  advanced_intelligent_discovery: "S5407036554"
+  advanced_science: null
+  advanced_robotics_research: null
+  advanced_theory_simulations: null
+  advanced_computing: null
+
+output:
+  shortlist_size: 10
+  output_dir: "./output"
+  timestamp_runs: false          # true → output/YYYY-MM-DD_HHMMSS/
+  auto_enrich: false             # run published-with-us after shortlist write
+  enrich_source_id: null         # default: first populated wiley_portfolio source (AIS)
+  enrich_latest_work: true
+  include_works_in_json: true
+  max_works_per_author: 5

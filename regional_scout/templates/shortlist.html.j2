@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regional Scout — {{ region }}</title>
+<style>
+:root {
+  --bg: #0f1419;
+  --surface: #1a2332;
+  --border: #2d3a4d;
+  --text: #e7ecf3;
+  --muted: #8b9cb3;
+  --accent: #5b9fd4;
+  --accent-dim: #3d6f94;
+  --positive: #6bcf7f;
+  --header-bg: #15202b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  font-size: 14px;
+}
+header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 1.25rem 1.5rem;
+}
+header h1 { margin: 0 0 0.25rem; font-size: 1.35rem; font-weight: 600; }
+header p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.85rem; }
+main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+th, td {
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+th {
+  background: var(--header-bg);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(91, 159, 212, 0.06); }
+.rank { color: var(--accent); font-weight: 700; width: 2rem; }
+.score { font-variant-numeric: tabular-nums; }
+.breakdown { font-size: 0.8rem; color: var(--muted); }
+.wiley-yes { color: var(--positive); }
+.wiley-no { color: var(--muted); }
+.works-detail { margin-top: 0.35rem; font-size: 0.78rem; }
+.works-detail summary { cursor: pointer; color: var(--accent); }
+.works-detail ul { margin: 0.35rem 0 0; padding-left: 1.1rem; color: var(--muted); }
+.latest-line { margin-top: 0.35rem; font-size: 0.78rem; color: var(--muted); }
+.latest-line em { color: var(--text); font-style: italic; }
+footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.tooltip { cursor: help; border-bottom: 1px dotted var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Regional Scout Shortlist</h1>
+  <p>{{ region }} · {{ year_from }}–{{ year_to }} · {{ generated_at }}</p>
+  <p>{{ eligible_count }} eligible / {{ candidate_count }} fetched ({{ excluded_count }} excluded, min in-scope) · {{ topic_count }} scope topics · credits {{ credits_used }} ({{ api_calls }} API, {{ cache_hits }} cached)</p>
+  {% if enrich_meta %}
+  <p>Published-with-us: {{ enrich_meta.target_journal_name }} ({{ enrich_meta.year_from }}–{{ enrich_meta.year_to }}) · enrich credits {{ enrich_meta.credits_used }}</p>
+  {% endif %}
+</header>
+<main>
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Researcher</th>
+      <th>Institution</th>
+      <th>Composite</th>
+      <th>In-scope</th>
+      <th>Breakdown</th>
+      <th><span class="tooltip" title="OpenAlex FWCI may read ~15–20% higher than SciVal/Scopus">FWCI</span></th>
+      <th>Wiley</th>
+    </tr>
+  </thead>
+  <tbody>
+{% for row in rows %}
+    <tr>
+      <td class="rank">{{ row.rank }}</td>
+      <td>
+        <strong>{{ row.display_name }}</strong><br>
+        <span class="breakdown">{{ row.openalex_id }}</span>
+        {% if row.in_scope_works %}
+        <details class="works-detail">
+          <summary>{{ row.in_scope_work_count }} in-scope works</summary>
+          <ul>
+          {% for w in row.in_scope_works %}
+            <li>{{ w.publication_year }} · {{ w.title[:80] }}{% if w.title|length > 80 %}…{% endif %}{% if w.fwci %} (FWCI {{ w.fwci }}){% endif %}</li>
+          {% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+        {% if row.published_with_us and row.published_with_us.latest_work %}
+        <div class="latest-line">Latest: <em>{{ row.published_with_us.latest_work.title[:70] }}{% if row.published_with_us.latest_work.title|length > 70 %}…{% endif %}</em>
+          {% if row.published_with_us.latest_work.source_display_name %} · {{ row.published_with_us.latest_work.source_display_name }}{% endif %}
+          {% if row.published_with_us.latest_work.publication_year %} ({{ row.published_with_us.latest_work.publication_year }}){% endif %}
+        </div>
+        {% endif %}
+      </td>
+      <td>{{ row.institution_name or "—" }}</td>
+      <td class="score">{{ "%.3f"|format(row.composite_score) }}</td>
+      <td class="score">{{ row.in_scope_work_count }}</td>
+      <td class="breakdown">
+        R {{ "%.2f"|format(row.breakdown.relevance) }}
+        · P {{ "%.2f"|format(row.breakdown.productivity) }}
+        · I {{ "%.2f"|format(row.breakdown.impact) }}
+        · C {{ "%.2f"|format(row.breakdown.centrality) }}
+        · W {{ "%.2f"|format(row.breakdown.wiley) }}
+      </td>
+      <td class="score">{{ row.mean_fwci if row.mean_fwci is not none else "—" }}</td>
+      <td>
+        {% if row.wiley_friendly %}
+        <span class="wiley-yes">Yes{% if row.wiley_journal %} ({{ row.wiley_journal }}){% endif %}</span>
+        {% else %}
+        <span class="wiley-no">No</span>
+        {% endif %}
+      </td>
+    </tr>
+{% endfor %}
+  </tbody>
+</table>
+</main>
+<footer>
+  {% if enrich_meta %}
+  Wiley check: <strong>{{ enrich_meta.target_journal_name }}</strong> (OpenAlex source {{ enrich_meta.target_source_id }}). Match key: <code>openalex_id</code>.
+  {% else %}
+  Run <code>shortlist.json</code> through <strong>published-with-us</strong> or enable <code>output.auto_enrich</code> (matches on <code>openalex_id</code>).
+  {% endif %}
+</footer>
+</body>
+</html>

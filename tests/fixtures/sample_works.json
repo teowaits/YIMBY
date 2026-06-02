@@ -1,0 +1,29 @@
+[
+  {
+    "openalex_id": "A1",
+    "title": "ML for materials",
+    "publication_year": 2024,
+    "primary_topic_id": "T100",
+    "primary_source_id": "S4210212817",
+    "fwci": 1.5,
+    "coauthor_ids": ["A1", "A2"]
+  },
+  {
+    "openalex_id": "W2",
+    "title": "Deep learning chemistry",
+    "publication_year": 2023,
+    "primary_topic_id": "T100",
+    "primary_source_id": null,
+    "fwci": 2.0,
+    "coauthor_ids": ["A1", "A2"]
+  },
+  {
+    "openalex_id": "W3",
+    "title": "Robotics",
+    "publication_year": 2022,
+    "primary_topic_id": "T200",
+    "primary_source_id": null,
+    "fwci": null,
+    "coauthor_ids": ["A2", "A3"]
+  }
+]

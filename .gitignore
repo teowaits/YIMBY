@@ -1,0 +1,38 @@
+# ── Secrets & local config (never commit) ─────────────────────────────────────
+config.local.yaml
+.env
+.env.*
+
+# Internal design docs (local only)
+CLAUDE.md
+CLAUDE.docx
+
+# ── Python ────────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ── Runtime / cache / output ──────────────────────────────────────────────────
+output/
+.cache/
+*.db
+
+# ── Web frontend ──────────────────────────────────────────────────────────────
+web/node_modules/
+web/dist/
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
