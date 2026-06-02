@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
+
+FilterType = Literal["ror", "institution", "country"]
 
 # ISSN → config key for init-portfolio
 PORTFOLIO_ISSNS: dict[str, str] = {
@@ -49,15 +51,78 @@ class OpenAlexConfig(BaseModel):
         return v
 
 
+class CityRegion(BaseModel):
+    name: str | None = None
+    country_code: str | None = None
+    institution_ids: list[str] = Field(default_factory=list)
+
+
 class RegionConfig(BaseModel):
     country_codes: list[str] = Field(default_factory=list)
+    city: CityRegion = Field(default_factory=CityRegion)
     ror_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def at_least_one_filter(self) -> RegionConfig:
-        if not self.country_codes and not self.ror_ids:
-            raise ValueError("region: set at least one of country_codes or ror_ids")
+    def validate_region(self) -> RegionConfig:
+        has_ror = bool(self.ror_ids)
+        has_city = bool(self.city.institution_ids)
+        has_country = bool(self.country_codes)
+        if not (has_ror or has_city or has_country):
+            raise ValueError(
+                "region: at least one of ror_ids, city.institution_ids, "
+                "or country_codes must be non-empty"
+            )
         return self
+
+
+def normalize_institution_id(inst_id: str) -> str:
+    """OpenAlex institution ID to short I… form."""
+    r = inst_id.strip()
+    if r.startswith("https://openalex.org/"):
+        return r.rsplit("/", 1)[-1]
+    return r
+
+
+def active_filter(region: RegionConfig) -> tuple[FilterType, list[str]]:
+    """Returns (filter_type, ids) — priority: ror > institution > country."""
+    if region.ror_ids:
+        return ("ror", list(region.ror_ids))
+    if region.city.institution_ids:
+        return (
+            "institution",
+            [normalize_institution_id(i) for i in region.city.institution_ids],
+        )
+    return ("country", [c.lower() for c in region.country_codes])
+
+
+def region_filter_metadata(region: RegionConfig) -> dict[str, Any]:
+    filter_type, ids = active_filter(region)
+    meta: dict[str, Any] = {
+        "type": filter_type,
+        "city": region.city.name,
+        "country_code": region.city.country_code,
+        "institution_count": len(ids) if filter_type == "institution" else None,
+        "values": ids,
+    }
+    if filter_type == "country":
+        meta["country_code"] = meta["country_code"] or (
+            ids[0] if len(ids) == 1 else None
+        )
+    return meta
+
+
+def log_active_filter_warnings(region: RegionConfig, filter_type: FilterType) -> None:
+    if filter_type == "ror":
+        if region.city.institution_ids or region.country_codes:
+            logger.warning(
+                "Using ror_ids; city.institution_ids and country_codes ignored."
+            )
+    elif filter_type == "institution":
+        if region.country_codes:
+            logger.warning(
+                "Using city.institution_ids (%d); country_codes ignored.",
+                len(region.city.institution_ids),
+            )
 
 
 class ScoringWeights(BaseModel):
@@ -118,26 +183,6 @@ class WileyPortfolioConfig(BaseModel):
         return getattr(self, key, None)
 
 
-def resolve_enrich_target(config: Config) -> tuple[str, str]:
-    """Return (source_id, journal_display_name) for enrich / auto_enrich."""
-    sid = config.output.enrich_source_id
-    if sid:
-        for key, val in PORTFOLIO_ISSNS.items():
-            if config.wiley_portfolio.source_id_for_key(key) == sid:
-                return sid, PORTFOLIO_DISPLAY_NAMES.get(key, sid)
-        return sid, sid
-
-    for key in PORTFOLIO_ISSNS:
-        val = config.wiley_portfolio.source_id_for_key(key)
-        if val:
-            return val, PORTFOLIO_DISPLAY_NAMES.get(key, val)
-
-    raise ValueError(
-        "No enrich source: set output.enrich_source_id or populate wiley_portfolio "
-        "(run init-portfolio)"
-    )
-
-
 class OutputConfig(BaseModel):
     shortlist_size: int = 10
     output_dir: str = "./output"
@@ -166,17 +211,24 @@ class Config(BaseModel):
         return (start, end)
 
     def region_filter(self) -> tuple[str, str]:
-        """Return (filter_field, filter_value) for OpenAlex authors endpoint."""
-        if self.region.ror_ids:
-            if self.region.country_codes:
-                logger.warning(
-                    "Both ror_ids and country_codes set; using ror_ids only "
-                    "(country_codes ignored)"
-                )
-            rors = "|".join(self._normalize_ror(r) for r in self.region.ror_ids)
-            return ("last_known_institutions.id", rors)
-        codes = "|".join(c.lower() for c in self.region.country_codes)
-        return ("last_known_institutions.country_code", codes)
+        """Return (filter_field, filter_value) for OpenAlex /authors endpoint."""
+        filter_type, ids = active_filter(self.region)
+        log_active_filter_warnings(self.region, filter_type)
+
+        if filter_type == "ror":
+            value = "|".join(self._normalize_ror(r) for r in ids)
+            return ("last_known_institutions.id", value)
+        if filter_type == "institution":
+            value = "|".join(ids)
+            return ("last_known_institutions.id", value)
+
+        logger.info(
+            "Filtering by country_code. Note: last_known_institutions is an array "
+            "in OpenAlex — results may include authors with secondary affiliations "
+            "in %s. For tighter results use city.institution_ids.",
+            ids,
+        )
+        return ("last_known_institutions.country_code", "|".join(ids))
 
     @staticmethod
     def _normalize_ror(ror: str) -> str:
@@ -188,8 +240,40 @@ class Config(BaseModel):
         return f"https://ror.org/{r}"
 
 
+def resolve_enrich_target(config: Config) -> tuple[str, str]:
+    """Return (source_id, journal_display_name) for enrich / auto_enrich."""
+    sid = config.output.enrich_source_id
+    if sid:
+        for key, val in PORTFOLIO_ISSNS.items():
+            if config.wiley_portfolio.source_id_for_key(key) == sid:
+                return sid, PORTFOLIO_DISPLAY_NAMES.get(key, sid)
+        return sid, sid
+
+    for key in PORTFOLIO_ISSNS:
+        val = config.wiley_portfolio.source_id_for_key(key)
+        if val:
+            return val, PORTFOLIO_DISPLAY_NAMES.get(key, val)
+
+    raise ValueError(
+        "No enrich source: set output.enrich_source_id or populate wiley_portfolio "
+        "(run init-portfolio)"
+    )
+
+
 def load_config(path: Path | str) -> Config:
     p = Path(path)
     with p.open() as f:
         data: dict[str, Any] = yaml.safe_load(f)
     return Config.model_validate(data)
+
+
+def region_summary_label(region: RegionConfig) -> str:
+    """Human-readable region label for logs and API responses."""
+    filter_type, ids = active_filter(region)
+    if filter_type == "ror":
+        return f"ROR ({len(ids)} institutions)"
+    if filter_type == "institution":
+        city = region.city.name or "city"
+        cc = region.city.country_code or "?"
+        return f"City ({city}, {cc}) — {len(ids)} institutions"
+    return f"Country ({','.join(ids)})"

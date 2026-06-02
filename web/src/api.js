@@ -42,6 +42,11 @@ export function listRuns() {
   return apiFetch("/api/runs");
 }
 
+export function getInitCity(city, country) {
+  const params = new URLSearchParams({ city, country });
+  return apiFetch(`/api/init-city?${params}`);
+}
+
 export function getShortlist(runId) {
   return apiFetch(`/api/runs/${encodeURIComponent(runId)}/shortlist`);
 }

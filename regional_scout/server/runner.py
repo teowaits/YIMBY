@@ -29,12 +29,26 @@ class JobLogHandler(logging.Handler):
 
 def merge_run_overrides(base: Config, overrides: dict[str, Any]) -> Config:
     data = base.model_dump()
-    if overrides.get("country_codes") is not None:
-        data["region"]["country_codes"] = overrides["country_codes"]
-        if overrides.get("ror_ids") is None:
-            data["region"]["ror_ids"] = []
-    if overrides.get("ror_ids") is not None:
+
+    institution_ids = overrides.get("institution_ids")
+    if institution_ids is not None and institution_ids:
+        # Institution/city mode: never combine with country_codes (would widen pool).
+        data["region"]["city"]["institution_ids"] = institution_ids
+        if overrides.get("city_name") is not None:
+            data["region"]["city"]["name"] = overrides["city_name"]
+        if overrides.get("city_country_code") is not None:
+            data["region"]["city"]["country_code"] = overrides["city_country_code"]
+        data["region"]["country_codes"] = []
+        data["region"]["ror_ids"] = []
+    elif overrides.get("ror_ids") is not None:
         data["region"]["ror_ids"] = overrides["ror_ids"]
+        data["region"]["country_codes"] = []
+        data["region"]["city"]["institution_ids"] = []
+    elif overrides.get("country_codes") is not None:
+        data["region"]["country_codes"] = overrides["country_codes"]
+        data["region"]["ror_ids"] = []
+        data["region"]["city"]["institution_ids"] = []
+
     if overrides.get("max_candidates") is not None:
         data["openalex"]["max_candidates"] = overrides["max_candidates"]
     if overrides.get("work_window_years") is not None:

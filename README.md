@@ -39,6 +39,9 @@ Edit `config.local.yaml` and set your OpenAlex API key ([get one free](https://o
 # Resolve portfolio source IDs (optional, first time)
 uv run regional-scout init-portfolio --config config.local.yaml --write
 
+# Trip mode: resolve Madrid institutions (10 credits, cached)
+uv run regional-scout init-city --city Madrid --country ES --config config.local.yaml --write
+
 # Run Italy example (default in config.yaml)
 uv run regional-scout run --config config.local.yaml
 ```
@@ -93,6 +96,7 @@ uv run regional-scout serve --config config.local.yaml
 | `estimate` | Credit preflight (no pipeline) |
 | `enrich` | Published-with-us checks |
 | `report` | Regenerate HTML from JSON |
+| `init-city` | Resolve city → OpenAlex institution IDs |
 | `init-portfolio` | Resolve journal OpenAlex source IDs |
 | `cache-clear` | Clear SQLite HTTP cache |
 

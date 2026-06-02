@@ -215,6 +215,30 @@ def serve_cmd(
     uvicorn.run(app, host=host, port=port, reload=reload)
 
 
+@app.command("init-city")
+def init_city_cmd(
+    city: str = typer.Option(..., "--city", help="City name (e.g. Madrid)"),
+    country: str = typer.Option(..., "--country", help="ISO 2-letter country code (e.g. ES)"),
+    config: Path = typer.Option(
+        Path("config.yaml"),
+        "--config",
+        "-c",
+        help="Path to config.yaml",
+        exists=True,
+        readable=True,
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Update config in place (preserves comments via ruamel.yaml)",
+    ),
+) -> None:
+    """Resolve OpenAlex institution IDs for a city."""
+    from regional_scout.city import init_city
+
+    init_city(config, city=city, country=country, write=write)
+
+
 @app.command("init-portfolio")
 def init_portfolio_cmd(
     config: Path = typer.Option(

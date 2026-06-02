@@ -9,8 +9,12 @@ openalex:
   cache_path: ".cache/regional-scout/openalex.db"
 
 region:
-  country_codes: ["it"]
-  ror_ids: []
+  country_codes: ["it"]   # coarse fallback; ignored when city.institution_ids is set
+  city:
+    name: null            # e.g. "Madrid" — set via init-city
+    country_code: null    # ISO 2-letter, e.g. "ES"
+    institution_ids: []   # OpenAlex institution IDs (I…), populated by init-city
+  ror_ids: []             # most targeted; overrides city and country_codes
 
 scoring:
   weights:

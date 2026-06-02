@@ -16,8 +16,10 @@ from regional_scout.config import (
     PORTFOLIO_ISSNS,
     Config,
     load_config,
+    region_summary_label,
 )
 from regional_scout.credits import estimate_run_credits
+from regional_scout.openalex import OpenAlexClient
 from regional_scout.server.jobs import create_job, get_job
 from regional_scout.server.runner import merge_run_overrides, start_run
 
@@ -51,6 +53,9 @@ def get_base_config() -> Config:
 class RunOverrides(BaseModel):
     country_codes: list[str] | None = None
     ror_ids: list[str] | None = None
+    city_name: str | None = None
+    city_country_code: str | None = None
+    institution_ids: list[str] | None = None
     max_candidates: int | None = None
     work_window_years: int | None = None
     max_credits_per_run: int | None = None
@@ -94,6 +99,12 @@ def settings() -> dict[str, Any]:
         "region": {
             "country_codes": cfg.region.country_codes,
             "ror_ids": cfg.region.ror_ids,
+            "city": {
+                "name": cfg.region.city.name,
+                "country_code": cfg.region.city.country_code,
+                "institution_ids": cfg.region.city.institution_ids,
+            },
+            "active_summary": region_summary_label(cfg.region),
         },
         "openalex": {
             "work_window_years": cfg.openalex.work_window_years,
@@ -135,6 +146,10 @@ def estimate(body: EstimateRequest) -> dict[str, Any]:
         "within_budget": est.total <= cfg.openalex.max_credits_per_run,
         "max_credits_per_run": cfg.openalex.max_credits_per_run,
         "message": est.format_message(),
+        "region_summary": region_summary_label(cfg.region),
+        "region_coarse": cfg.region.country_codes
+        and not cfg.region.ror_ids
+        and not cfg.region.city.institution_ids,
     }
 
 
@@ -217,6 +232,24 @@ def get_shortlist(run_id: str) -> dict[str, Any]:
     if not path.is_file():
         raise HTTPException(404, "Shortlist not found")
     return json.loads(path.read_text())
+
+
+@app.get("/api/init-city")
+def init_city_api(city: str, country: str) -> dict[str, Any]:
+    """Resolve institutions for a city (10 credits, cached)."""
+    from regional_scout.city import resolve_city_institutions
+
+    cfg = get_base_config()
+    client = OpenAlexClient(cfg)
+    try:
+        institutions = resolve_city_institutions(client, city, country)
+        return {
+            "city": city,
+            "country_code": country.lower(),
+            "institutions": institutions,
+        }
+    finally:
+        client.close()
 
 
 # Serve built web UI when web/dist exists (after `cd web && npm run build`)

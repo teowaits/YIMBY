@@ -143,3 +143,4 @@ class RunMetadata:
     publication_year_to: int
     output_dir: str
     scope_summary: dict[str, Any]
+    region_filter: dict[str, Any] = field(default_factory=dict)

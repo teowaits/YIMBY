@@ -7,7 +7,13 @@ from pathlib import Path
 
 from regional_scout import __version__
 from regional_scout.candidates import fetch_candidates
-from regional_scout.config import Config, resolve_enrich_target
+from regional_scout.config import (
+    Config,
+    active_filter,
+    region_filter_metadata,
+    region_summary_label,
+    resolve_enrich_target,
+)
 from regional_scout.credits import assert_within_budget, estimate_run_credits, should_check_wiley
 from regional_scout.graph import build_coauthor_graph, compute_centrality
 from regional_scout.models import AuthorRecord, RunMetadata, ScoredAuthor, WorkRecord
@@ -76,6 +82,14 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
     estimate = estimate_run_credits(config)
     logger.info("%s", estimate.format_message())
     assert_within_budget(config, estimate)
+
+    filter_type, filter_ids = active_filter(config.region)
+    logger.info("Region filter: %s (%d value(s))", filter_type, len(filter_ids))
+    if filter_type == "country":
+        logger.warning(
+            "Country-level filter active. For trip-mode accuracy use "
+            "'regional-scout init-city --city <name> --country <code> --write' first."
+        )
 
     check_wiley = should_check_wiley(config)
     portfolio_ids = config.wiley_portfolio.portfolio_source_ids()
@@ -167,7 +181,7 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
         top = scored[: config.output.shortlist_size]
         shortlist_path = out_dir / "shortlist.json"
         meta = RunMetadata(
-            region_label=_region_label(config),
+            region_label=region_summary_label(config.region),
             topic_count=len(scope.topic_ids),
             candidate_count=len(candidates),
             eligible_count=len(eligible),
@@ -185,6 +199,7 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
                 "min_in_scope_works": min_in_scope,
                 "scope_author_prefilter": config.scoring.scope_author_prefilter,
             },
+            region_filter=region_filter_metadata(config.region),
         )
 
         top_works_map = {
@@ -220,9 +235,3 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
         return top
     finally:
         client.close()
-
-
-def _region_label(config: Config) -> str:
-    if config.region.ror_ids:
-        return f"ROR ({len(config.region.ror_ids)} institutions)"
-    return ",".join(config.region.country_codes)

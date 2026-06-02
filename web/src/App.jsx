@@ -8,24 +8,17 @@ import {
   postEstimate,
   postRun,
 } from "./api.js";
-import { C, ghostBtn, inputStyle, selectStyle } from "./constants.js";
+import { C, ghostBtn, selectStyle } from "./constants.js";
+import RegionSelector from "./components/RegionSelector.jsx";
 import ShortlistTable from "./components/ShortlistTable.jsx";
 import { ProgressBar, Spinner } from "./components/shared.jsx";
-
-const REGION_PRESETS = [
-  { label: "Italy", codes: ["it"] },
-  { label: "Germany", codes: ["de"] },
-  { label: "France", codes: ["fr"] },
-  { label: "United Kingdom", codes: ["gb"] },
-  { label: "United States", codes: ["us"] },
-];
 
 export default function App() {
   const [settings, setSettings] = useState(null);
   const [apiOk, setApiOk] = useState(false);
   const [tab, setTab] = useState("run");
 
-  const [countryCodes, setCountryCodes] = useState(["it"]);
+  const [regionOverrides, setRegionOverrides] = useState({ country_codes: ["it"] });
   const [maxCandidates, setMaxCandidates] = useState(200);
   const [workWindow, setWorkWindow] = useState(5);
   const [shortlistSize, setShortlistSize] = useState(10);
@@ -46,7 +39,7 @@ export default function App() {
 
   const overrides = useCallback(
     () => ({
-      country_codes: countryCodes,
+      ...regionOverrides,
       max_candidates: maxCandidates,
       work_window_years: workWindow,
       shortlist_size: shortlistSize,
@@ -55,7 +48,7 @@ export default function App() {
       timestamp_runs: timestampRuns,
     }),
     [
-      countryCodes,
+      regionOverrides,
       maxCandidates,
       workWindow,
       shortlistSize,
@@ -65,6 +58,11 @@ export default function App() {
     ]
   );
 
+  const regionReady =
+    (regionOverrides.institution_ids && regionOverrides.institution_ids.length > 0) ||
+    (regionOverrides.country_codes && regionOverrides.country_codes.length > 0) ||
+    (regionOverrides.ror_ids && regionOverrides.ror_ids.length > 0);
+
   useEffect(() => {
     (async () => {
       try {
@@ -72,7 +70,17 @@ export default function App() {
         setApiOk(true);
         const s = await getSettings();
         setSettings(s);
-        setCountryCodes(s.region.country_codes.length ? s.region.country_codes : ["it"]);
+        if (s.region?.city?.institution_ids?.length) {
+          setRegionOverrides({
+            city_name: s.region.city.name,
+            city_country_code: s.region.city.country_code,
+            institution_ids: s.region.city.institution_ids,
+          });
+        } else {
+          setRegionOverrides({
+            country_codes: s.region.country_codes.length ? s.region.country_codes : ["it"],
+          });
+        }
         setMaxCandidates(s.openalex.max_candidates);
         setWorkWindow(s.openalex.work_window_years);
         setShortlistSize(s.output.shortlist_size);
@@ -301,45 +309,7 @@ export default function App() {
                   marginBottom: 16,
                 }}
               >
-                <label style={{ fontSize: 11, color: C.textMuted }}>
-                  <span
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    Region (ISO country)
-                  </span>
-                  <input
-                    style={inputStyle}
-                    value={countryCodes.join(", ")}
-                    disabled={isRunning}
-                    onChange={(e) =>
-                      setCountryCodes(
-                        e.target.value
-                          .split(/[,\s]+/)
-                          .map((c) => c.trim().toLowerCase())
-                          .filter(Boolean)
-                      )
-                    }
-                    placeholder="it, de, fr"
-                  />
-                  <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                    {REGION_PRESETS.map((p) => (
-                      <button
-                        key={p.label}
-                        type="button"
-                        disabled={isRunning}
-                        onClick={() => setCountryCodes(p.codes)}
-                        style={{ ...ghostBtn, padding: "4px 10px", fontSize: 10 }}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </label>
+                <RegionSelector disabled={isRunning} onChange={setRegionOverrides} />
 
                 <label style={{ fontSize: 11, color: C.textMuted }}>
                   <span
@@ -483,7 +453,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleRun}
-                  disabled={isRunning || !apiOk || !countryCodes.length}
+                  disabled={isRunning || !apiOk || !regionReady}
                   style={{
                     padding: "10px 26px",
                     borderRadius: 8,
@@ -500,6 +470,12 @@ export default function App() {
                 </button>
                 {estimate && (
                   <div style={{ fontSize: 11, color: estimate.within_budget ? C.greenDark : C.red }}>
+                    {estimate.region_summary && (
+                      <span style={{ marginRight: 10, color: estimate.region_coarse ? C.amber : C.textSecondary }}>
+                        {estimate.region_summary}
+                        {estimate.region_coarse ? " ⚠ coarse filter" : ""}
+                      </span>
+                    )}
                     Est. {estimate.total.toLocaleString()} credits
                     {!estimate.within_budget && " — over budget"}
                   </div>
@@ -612,6 +588,18 @@ export default function App() {
                 {shortlistDoc.region && (
                   <span>
                     Region <strong style={{ color: C.textSecondary }}>{shortlistDoc.region}</strong>
+                    {" · "}
+                  </span>
+                )}
+                {shortlistDoc.region_filter && (
+                  <span>
+                    Filter{" "}
+                    <strong style={{ color: C.textSecondary }}>
+                      {shortlistDoc.region_filter.type}
+                    </strong>
+                    {shortlistDoc.region_filter.city && (
+                      <> · {shortlistDoc.region_filter.city}</>
+                    )}
                     {" · "}
                   </span>
                 )}
