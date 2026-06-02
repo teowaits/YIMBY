@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
+from typing import Any
 
 from regional_scout.config import (
     Config,
     FilterType,
     active_filter,
     log_active_filter_warnings,
+    normalize_institution_id,
 )
 from regional_scout.models import AuthorRecord, ScopeVector
 from regional_scout.openalex import OpenAlexClient, MAX_FILTER_IDS, openalex_id
@@ -17,7 +20,8 @@ from regional_scout.openalex_parse import parse_author
 logger = logging.getLogger(__name__)
 
 AUTHOR_SELECT = (
-    "id,display_name,last_known_institutions,cited_by_count,works_count,counts_by_year"
+    "id,display_name,orcid,last_known_institutions,affiliations,"
+    "cited_by_count,works_count,counts_by_year"
 )
 MAX_PAGES_PER_BATCH = 5
 # Authors endpoint: topics.id OR lists; keep batches smaller than works
@@ -49,11 +53,7 @@ def _works_geo_fragment(filter_type: FilterType, ids: list[str]) -> str:
     """
     Geo filter fragment for /works (authorships.institutions.*).
 
-    MUST stay aligned with _author_geo_fragment — same active_filter() branch
-    and ID batch. The portfolio-works scan uses this to discover authors for
-    scope prefilter; the co-author graph is built from in-scope works of the
-    candidate pool (graph.py has no separate geo filter), so a mismatch here
-    would pull a different author set than /authors filtering.
+    Used only for auxiliary /works queries — not for candidate pool construction.
     """
     value = _format_geo_value(filter_type, ids)
     if filter_type == "country":
@@ -92,6 +92,68 @@ def _works_region_filter_for_batch(config: Config, id_batch: list[str]) -> str:
     return _works_geo_fragment(filter_type, id_batch)
 
 
+def _is_primarily_local(
+    raw: dict[str, Any],
+    target_institution_ids: set[str],
+    recency_years: int,
+    current_year: int,
+) -> bool:
+    """
+    True if the author has a recent affiliation with a target institution.
+
+    Uses affiliations from the /authors response when present; falls back to
+    last_known_institutions when affiliation history is sparse.
+    """
+    threshold_year = current_year - recency_years
+
+    affiliations = raw.get("affiliations") or []
+    if affiliations:
+        for aff in affiliations:
+            inst = aff.get("institution") or {}
+            inst_id = inst.get("id")
+            if not inst_id:
+                continue
+            if normalize_institution_id(inst_id) in target_institution_ids:
+                aff_years = aff.get("years") or []
+                if not aff_years or max(aff_years) >= threshold_year:
+                    return True
+        return False
+
+    for inst in raw.get("last_known_institutions") or []:
+        inst_id = inst.get("id")
+        if inst_id and normalize_institution_id(inst_id) in target_institution_ids:
+            return True
+    return False
+
+
+def _verify_institution_affiliation(
+    raw_authors: list[dict[str, Any]],
+    config: Config,
+) -> list[dict[str, Any]]:
+    """Drop authors with only incidental target-institution affiliation."""
+    filter_type, ids = active_filter(config.region)
+    if filter_type != "institution":
+        return raw_authors
+
+    target_ids = set(ids)
+    recency_years = config.region.city.affiliation_recency_years
+    current_year = date.today().year
+    kept = [
+        raw
+        for raw in raw_authors
+        if _is_primarily_local(raw, target_ids, recency_years, current_year)
+    ]
+    n_dropped = len(raw_authors) - len(kept)
+    if n_dropped:
+        logger.info(
+            "Post-fetch affiliation verification: dropped %d candidates with "
+            "incidental local affiliation (co-authored with local researchers "
+            "but not primarily based here).",
+            n_dropped,
+        )
+    return kept
+
+
 def merge_authors_by_citations(authors: list[AuthorRecord]) -> list[AuthorRecord]:
     by_id: dict[str, AuthorRecord] = {}
     for a in authors:
@@ -104,6 +166,7 @@ def merge_authors_by_citations(authors: list[AuthorRecord]) -> list[AuthorRecord
 def _fetch_authors_list(
     client: OpenAlexClient,
     geo_filter: str,
+    config: Config,
     *,
     max_pages: int,
     extra_filter: str | None = None,
@@ -119,7 +182,8 @@ def _fetch_authors_list(
         },
         max_pages=max_pages,
     )
-    return [parse_author(r) for r in raw]
+    verified = _verify_institution_affiliation(raw, config)
+    return [parse_author(r) for r in verified]
 
 
 def fetch_candidates(
@@ -129,9 +193,8 @@ def fetch_candidates(
 ) -> list[AuthorRecord]:
     """
     When scope_author_prefilter is on (default), only authors likely relevant
-    to the scope are returned:
-    - /authors filtered by region, citations, and topics.id (no publication_year)
-    - /works in portfolio sources + window + region → author IDs → /authors
+    to the scope are returned via /authors filtered by region, citations, and
+    topics.id (no publication_year).
     """
     if scope is not None and config.scoring.scope_author_prefilter:
         return _fetch_scoped_candidates(client, config, scope)
@@ -147,7 +210,9 @@ def _fetch_regional_candidates(
 
     for batch in batches:
         geo_filter = _region_citation_filter_for_batch(config, batch)
-        collected.extend(_fetch_authors_list(client, geo_filter, max_pages=max_pages))
+        collected.extend(
+            _fetch_authors_list(client, geo_filter, config, max_pages=max_pages)
+        )
 
     merged = merge_authors_by_citations(collected)
     capped = merged[: config.openalex.max_candidates]
@@ -158,70 +223,6 @@ def _fetch_regional_candidates(
         len(batches),
     )
     return capped
-
-
-def _fetch_authors_by_ids(
-    client: OpenAlexClient, author_ids: set[str]
-) -> list[AuthorRecord]:
-    if not author_ids:
-        return []
-    collected: list[AuthorRecord] = []
-    sorted_ids = sorted(author_ids)
-    for i in range(0, len(sorted_ids), MAX_FILTER_IDS):
-        chunk = sorted_ids[i : i + MAX_FILTER_IDS]
-        filt = f"openalex_id:{'|'.join(chunk)}"
-        raw = client.fetch_list(
-            "/authors",
-            {"filter": filt, "select": AUTHOR_SELECT, "per-page": "200"},
-            max_pages=1,
-        )
-        collected.extend(parse_author(r) for r in raw)
-    return collected
-
-
-def _author_ids_from_portfolio_works(
-    client: OpenAlexClient,
-    config: Config,
-    scope: ScopeVector,
-) -> set[str]:
-    """
-    Discover regional authors via in-window works in portfolio sources.
-    Uses _works_geo_fragment (same active_filter branch as /authors).
-    """
-    y0, y1 = config.publication_year_range
-    sources = "|".join(sorted(scope.source_ids))
-    _, batches = _geo_id_batches(config)
-    ids: set[str] = set()
-    total_works = 0
-
-    for batch in batches:
-        works_geo = _works_region_filter_for_batch(config, batch)
-        filt = ",".join(
-            [
-                f"primary_location.source.id:{sources}",
-                f"publication_year:{y0}-{y1}",
-                works_geo,
-            ]
-        )
-        raw = client.fetch_list(
-            "/works",
-            {"filter": filt, "select": "authorships", "per-page": "200"},
-            max_pages=MAX_PAGES_PER_BATCH * 2,
-        )
-        total_works += len(raw)
-        for work in raw:
-            for auth in work.get("authorships") or []:
-                author = auth.get("author") or {}
-                if author.get("id"):
-                    ids.add(openalex_id(author["id"]))
-
-    logger.info(
-        "Portfolio works scan: %d works → %d unique author IDs (%d geo batches)",
-        total_works,
-        len(ids),
-        len(batches),
-    )
-    return ids
 
 
 def _fetch_scoped_candidates(
@@ -242,14 +243,11 @@ def _fetch_scoped_candidates(
                 _fetch_authors_list(
                     client,
                     base,
+                    config,
                     max_pages=MAX_PAGES_PER_BATCH,
                     extra_filter=f"topics.id:{topics}",
                 )
             )
-
-    if scope.source_ids:
-        work_author_ids = _author_ids_from_portfolio_works(client, config, scope)
-        collected.extend(_fetch_authors_by_ids(client, work_author_ids))
 
     merged = merge_authors_by_citations(collected)
     min_cites = config.scoring.min_cited_by_count

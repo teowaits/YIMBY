@@ -1,11 +1,10 @@
-"""Tests for scoped candidate merge."""
+"""Candidate fetch affiliation verification."""
 
-from regional_scout.candidates import (
-    AUTHOR_TOPIC_BATCH,
-    merge_authors_by_citations,
-    _region_citation_filter,
-)
+from __future__ import annotations
+
+from regional_scout.candidates import _is_primarily_local, _verify_institution_affiliation
 from regional_scout.config import (
+    CityRegion,
     Config,
     OpenAlexConfig,
     OutputConfig,
@@ -14,13 +13,16 @@ from regional_scout.config import (
     ScopeConfig,
     WileyPortfolioConfig,
 )
-from regional_scout.models import AuthorRecord
+
+UCM_ID = "I126973510"
+HARBIN_ID = "I201646483"
 
 
-def _config() -> Config:
+def _config(**city_kw) -> Config:
+    city = CityRegion(name="Madrid", country_code="ES", **city_kw)
     return Config(
         openalex=OpenAlexConfig(api_key="test-key-12345678"),
-        region=RegionConfig(country_codes=["it"]),
+        region=RegionConfig(country_codes=[], city=city),
         scoring=ScoringConfig(),
         scope=ScopeConfig(),
         wiley_portfolio=WileyPortfolioConfig(),
@@ -28,22 +30,84 @@ def _config() -> Config:
     )
 
 
-def test_merge_authors_keeps_highest_citation_and_sorts():
-    authors = [
-        AuthorRecord("A1", "Low", None, "it", 10, 5),
-        AuthorRecord("A2", "High", None, "it", 100, 5),
-        AuthorRecord("A1", "Low dup", None, "it", 50, 5),
-    ]
-    merged = merge_authors_by_citations(authors)
-    assert [a.openalex_id for a in merged] == ["A2", "A1"]
-    assert merged[1].cited_by_count == 50
+def _author(
+    *,
+    affiliations: list | None = None,
+    last_known: list | None = None,
+) -> dict:
+    return {
+        "id": "https://openalex.org/A123",
+        "affiliations": affiliations if affiliations is not None else [],
+        "last_known_institutions": last_known or [],
+    }
 
 
-def test_region_filter_excludes_publication_year():
-    filt = _region_citation_filter(_config())
-    assert "publication_year" not in filt
-    assert "country_code:it" in filt
+def test_is_primarily_local_true():
+    raw = _author(
+        affiliations=[
+            {
+                "institution": {"id": f"https://openalex.org/{UCM_ID}"},
+                "years": [2022, 2024],
+            }
+        ]
+    )
+    assert _is_primarily_local(raw, {UCM_ID}, recency_years=3, current_year=2026)
 
 
-def test_author_topic_batch_smaller_than_works_batch():
-    assert AUTHOR_TOPIC_BATCH <= 50
+def test_is_primarily_local_false_old_affiliation():
+    raw = _author(
+        affiliations=[
+            {
+                "institution": {"id": f"https://openalex.org/{UCM_ID}"},
+                "years": [2016, 2018],
+            }
+        ]
+    )
+    assert not _is_primarily_local(raw, {UCM_ID}, recency_years=3, current_year=2026)
+
+
+def test_is_primarily_local_false_coauthor_only():
+    raw = _author(
+        affiliations=[
+            {
+                "institution": {"id": f"https://openalex.org/{HARBIN_ID}"},
+                "years": [2023, 2025],
+            }
+        ],
+        last_known=[
+            {"id": f"https://openalex.org/{UCM_ID}", "display_name": "UCM"},
+            {"id": f"https://openalex.org/{HARBIN_ID}", "display_name": "Harbin"},
+        ],
+    )
+    assert not _is_primarily_local(raw, {UCM_ID}, recency_years=3, current_year=2026)
+
+
+def test_is_primarily_local_fallback():
+    raw = _author(
+        affiliations=[],
+        last_known=[{"id": f"https://openalex.org/{UCM_ID}", "display_name": "UCM"}],
+    )
+    assert _is_primarily_local(raw, {UCM_ID}, recency_years=3, current_year=2026)
+
+
+def test_post_fetch_filter_drops_coauthors():
+    ucm_author = _author(
+        affiliations=[
+            {
+                "institution": {"id": f"https://openalex.org/{UCM_ID}"},
+                "years": [2024],
+            }
+        ]
+    )
+    harbin_author = _author(
+        affiliations=[
+            {
+                "institution": {"id": f"https://openalex.org/{HARBIN_ID}"},
+                "years": [2024],
+            }
+        ],
+        last_known=[{"id": f"https://openalex.org/{UCM_ID}", "display_name": "UCM"}],
+    )
+    cfg = _config(institution_ids=[UCM_ID])
+    kept = _verify_institution_affiliation([ucm_author, harbin_author], cfg)
+    assert kept == [ucm_author]

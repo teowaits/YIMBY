@@ -55,6 +55,7 @@ class CityRegion(BaseModel):
     name: str | None = None
     country_code: str | None = None
     institution_ids: list[str] = Field(default_factory=list)
+    affiliation_recency_years: int = 3
 
 
 class RegionConfig(BaseModel):
