@@ -35,6 +35,9 @@ class CreditEstimate:
 
 
 def should_check_wiley(config: Config) -> bool:
+    """Run per-author portfolio lookup when any source IDs are configured."""
+    if config.wiley_portfolio.portfolio_source_ids():
+        return True
     return config.wiley_portfolio.should_check_wiley(config.scoring.weights.wiley)
 
 

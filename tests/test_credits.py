@@ -27,17 +27,38 @@ def _config(**kwargs) -> Config:
 
 
 def test_wiley_credits_only_when_enabled():
-    off = _config()
-    assert should_check_wiley(off) is False
-    assert estimate_run_credits(off).wiley == 0
+    configured = _config()
+    assert should_check_wiley(configured) is True
+    assert estimate_run_credits(configured).wiley > 0
+
+    empty = _config(
+        wiley_portfolio={
+            "advanced_intelligent_systems": None,
+            "advanced_intelligent_discovery": None,
+        }
+    )
+    assert should_check_wiley(empty) is False
+    assert estimate_run_credits(empty).wiley == 0
 
     from regional_scout.config import ScoringWeights
 
-    weight = _config(scoring={"weights": ScoringWeights(wiley=0.1)})
+    weight = _config(
+        scoring={"weights": ScoringWeights(wiley=0.1)},
+        wiley_portfolio={
+            "advanced_intelligent_systems": None,
+            "advanced_intelligent_discovery": None,
+        },
+    )
     assert should_check_wiley(weight) is True
     assert estimate_run_credits(weight).wiley > 0
 
-    always = _config(wiley_portfolio={"always_check": True})
+    always = _config(
+        wiley_portfolio={
+            "always_check": True,
+            "advanced_intelligent_systems": None,
+            "advanced_intelligent_discovery": None,
+        }
+    )
     assert should_check_wiley(always) is True
     assert estimate_run_credits(always).wiley > 0
 

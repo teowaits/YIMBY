@@ -294,7 +294,7 @@ export default function ShortlistTable({ doc }) {
                   </div>
                 ) : (
                   <div style={{ marginTop: 6, fontSize: "0.75rem", color: C.textMuted }}>
-                    No Wiley AI/Comp portfolio publications in window
+                    No Wiley AI/Comp portfolio
                   </div>
                 )}
                 {(row.in_scope_works || []).length > 0 && (
