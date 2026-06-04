@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getInitCity } from "../api.js";
 import { C, ghostBtn, inputStyle, selectStyle } from "../constants.js";
 import { Spinner } from "./shared.jsx";
@@ -37,12 +37,14 @@ export default function RegionSelector({ disabled, onChange }) {
   const [cityName, setCityName] = useState("");
   const [cityCountry, setCityCountry] = useState("es");
   const [resolved, setResolved] = useState([]);
-  const [checked, setChecked] = useState({});
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const selectAllRef = useRef(null);
   const [resolvePhase, setResolvePhase] = useState("idle");
   const [resolveError, setResolveError] = useState("");
   const [geocodeMeta, setGeocodeMeta] = useState(null);
   const [confirmedCity, setConfirmedCity] = useState(null);
   const [manualIds, setManualIds] = useState("");
+  const [radiusKm, setRadiusKm] = useState(30);
 
   const emit = (next) => {
     if (onChange) onChange(next);
@@ -111,7 +113,7 @@ export default function RegionSelector({ disabled, onChange }) {
     setResolveError("");
     setGeocodeMeta(null);
     try {
-      const data = await getInitCity(cityName.trim(), cityCountry);
+      const data = await getInitCity(cityName.trim(), cityCountry, radiusKm);
       setGeocodeMeta({
         city: data.city,
         canonical_name: data.canonical_name,
@@ -121,11 +123,7 @@ export default function RegionSelector({ disabled, onChange }) {
         country_code: data.country_code,
       });
       setResolved(data.institutions || []);
-      const initChecked = {};
-      (data.institutions || []).forEach((inst) => {
-        initChecked[inst.id] = true;
-      });
-      setChecked(initChecked);
+      setSelectedIds(new Set((data.institutions || []).map((inst) => inst.id)));
       setResolvePhase("done");
     } catch (e) {
       setResolvePhase("error");
@@ -134,7 +132,7 @@ export default function RegionSelector({ disabled, onChange }) {
   };
 
   const handleConfirmSelection = () => {
-    const ids = resolved.filter((r) => checked[r.id]).map((r) => r.id);
+    const ids = resolved.filter((r) => selectedIds.has(r.id)).map((r) => r.id);
     const payload = {
       city_name: cityName.trim(),
       city_country_code: cityCountry,
@@ -149,10 +147,37 @@ export default function RegionSelector({ disabled, onChange }) {
   const handleClearCity = () => {
     setConfirmedCity(null);
     setResolved([]);
-    setChecked({});
+    setSelectedIds(new Set());
     setGeocodeMeta(null);
     emit({});
   };
+
+  const toggleInstitution = (id, checked) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllChange = (checked) => {
+    if (checked) {
+      setSelectedIds(new Set(resolved.map((inst) => inst.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const ids = resolved.map((i) => i.id);
+    const n = ids.filter((id) => selectedIds.has(id)).length;
+    selectAllRef.current.indeterminate = n > 0 && n < ids.length;
+  }, [selectedIds, resolved]);
+
+  const selectedCount = resolved.filter((r) => selectedIds.has(r.id)).length;
+  const allSelected = resolved.length > 0 && selectedCount === resolved.length;
 
   const handleManualChange = (text) => {
     setManualIds(text);
@@ -290,6 +315,24 @@ export default function RegionSelector({ disabled, onChange }) {
                     ))}
                   </select>
                 </label>
+                <label style={{ fontSize: 11, color: C.textMuted, width: 110 }}>
+                  <span style={{ display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Radius
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input
+                      type="number"
+                      min={5}
+                      max={200}
+                      step={5}
+                      value={radiusKm}
+                      disabled={disabled}
+                      onChange={(e) => setRadiusKm(Number(e.target.value))}
+                      style={{ ...inputStyle, width: 70, padding: "5px 8px" }}
+                    />
+                    <span style={{ fontSize: 11, color: C.textMuted }}>km</span>
+                  </span>
+                </label>
                 <div style={{ display: "flex", alignItems: "flex-end" }}>
                   <button
                     type="button"
@@ -319,48 +362,81 @@ export default function RegionSelector({ disabled, onChange }) {
                 </p>
               )}
               {resolved.length > 0 && (
-                <div
-                  style={{
-                    maxHeight: 220,
-                    overflow: "auto",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    marginBottom: 10,
-                    fontSize: 11,
-                  }}
-                >
-                  {resolved.map((inst) => (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                      fontSize: 10,
+                    }}
+                  >
                     <label
-                      key={inst.id}
                       style={{
                         display: "flex",
-                        gap: 10,
-                        alignItems: "flex-start",
-                        padding: "6px 0",
-                        borderBottom: `1px solid ${C.border}`,
-                        cursor: "pointer",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                        color: C.textSecondary,
                       }}
                     >
                       <input
+                        ref={selectAllRef}
                         type="checkbox"
-                        checked={!!checked[inst.id]}
+                        checked={allSelected}
                         disabled={disabled}
-                        onChange={(e) => setChecked((c) => ({ ...c, [inst.id]: e.target.checked }))}
+                        onChange={(e) => handleSelectAllChange(e.target.checked)}
                       />
-                      <span>
-                        <strong style={{ color: C.textPrimary }}>
-                          {inst.name || inst.display_name}
-                        </strong>
-                        <span style={{ color: C.textMuted }}>
-                          {" "}
-                          ({inst.distance_km != null ? `${Number(inst.distance_km).toFixed(1)} km · ` : ""}
-                          {inst.works_count?.toLocaleString()} works)
-                        </span>
-                      </span>
+                      Select all
                     </label>
-                  ))}
-                </div>
+                    <span style={{ color: C.textMuted }}>
+                      {selectedCount} of {resolved.length} selected
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      maxHeight: 220,
+                      overflow: "auto",
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      marginBottom: 10,
+                      fontSize: 11,
+                    }}
+                  >
+                    {resolved.map((inst) => (
+                      <label
+                        key={inst.id}
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "flex-start",
+                          padding: "6px 0",
+                          borderBottom: `1px solid ${C.border}`,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(inst.id)}
+                          disabled={disabled}
+                          onChange={(e) => toggleInstitution(inst.id, e.target.checked)}
+                        />
+                        <span style={{ lineHeight: 1.4 }}>
+                          <strong style={{ color: C.textPrimary, fontWeight: 600 }}>
+                            {inst.name || inst.display_name}
+                          </strong>
+                          <span style={{ color: C.textMuted, fontSize: 10 }}>
+                            {inst.distance_km != null
+                              ? ` · ${Number(inst.distance_km).toFixed(1)} km · ${inst.works_count?.toLocaleString()} works`
+                              : ` · ${inst.works_count?.toLocaleString()} works`}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
               )}
               {resolved.length > 0 && (
                 <button
@@ -369,7 +445,7 @@ export default function RegionSelector({ disabled, onChange }) {
                   style={{ ...ghostBtn, color: C.blueLight }}
                   onClick={handleConfirmSelection}
                 >
-                  Use selected ({resolved.filter((r) => checked[r.id]).length})
+                  Use selected ({selectedCount})
                 </button>
               )}
             </>

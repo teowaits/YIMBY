@@ -171,6 +171,8 @@ def resolve_city_institutions(
     city: str,
     country_code: str,
     config: Config,
+    *,
+    radius_km: float | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Returns (institutions, geocode_result).
@@ -180,12 +182,14 @@ def resolve_city_institutions(
     """
     geocode = _geocode_city(city, country_code, config)
     institutions = _fetch_country_institutions(client, country_code, config)
-    radius_km = config.region.city.radius_km
+    effective_radius = (
+        radius_km if radius_km is not None else config.region.city.radius_km
+    )
     nearby = _institutions_within_radius(
         institutions,
         city_lat=geocode["lat"],
         city_lon=geocode["lon"],
-        radius_km=radius_km,
+        radius_km=effective_radius,
     )
     return nearby, geocode
 
@@ -208,11 +212,17 @@ def init_city(
     city: str,
     country: str,
     write: bool = False,
+    radius: float | None = None,
 ) -> list[dict]:
     config = load_config(config_path)
     client = OpenAlexClient(config)
+    effective_radius = (
+        radius if radius is not None else config.region.city.radius_km
+    )
     try:
-        rows, geocode = resolve_city_institutions(client, city, country, config)
+        rows, geocode = resolve_city_institutions(
+            client, city, country, config, radius_km=radius
+        )
         print(
             f"Resolved {city!r} → {geocode['canonical_name']} "
             f"({geocode['lat']:.4f}, {geocode['lon']:.4f})",
@@ -220,12 +230,12 @@ def init_city(
         )
         if not rows:
             print(
-                f"No institutions within {config.region.city.radius_km} km of "
+                f"No institutions within {effective_radius} km of "
                 f"{city!r} in {country.upper()}",
                 file=sys.stderr,
             )
         else:
-            _print_table(rows, radius_km=config.region.city.radius_km)
+            _print_table(rows, radius_km=effective_radius)
 
         inst_ids = [r["id"] for r in rows]
 
@@ -240,7 +250,8 @@ def init_city(
             city_block["name"] = city
             city_block["country_code"] = country.lower()
             city_block["institution_ids"] = inst_ids
-            city_block["radius_km"] = config.region.city.radius_km
+            if radius is None:
+                city_block["radius_km"] = config.region.city.radius_km
 
             with config_path.open("w") as f:
                 yaml.dump(data, f)
@@ -250,7 +261,7 @@ def init_city(
             )
 
         print(
-            SUPPLEMENT_NOTE.format(radius_km=config.region.city.radius_km),
+            SUPPLEMENT_NOTE.format(radius_km=effective_radius),
             file=sys.stderr,
         )
         return rows

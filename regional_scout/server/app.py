@@ -235,21 +235,30 @@ def get_shortlist(run_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/init-city")
-def init_city_api(city: str, country: str) -> dict[str, Any]:
+def init_city_api(
+    city: str,
+    country: str,
+    radius: float | None = None,
+) -> dict[str, Any]:
     """Resolve institutions near a city via geocoding + coordinate filter."""
     from regional_scout.city import resolve_city_institutions
 
     cfg = get_base_config()
     client = OpenAlexClient(cfg)
     try:
-        institutions, geocode = resolve_city_institutions(client, city, country, cfg)
+        institutions, geocode = resolve_city_institutions(
+            client, city, country, cfg, radius_km=radius
+        )
+        effective_radius = (
+            radius if radius is not None else cfg.region.city.radius_km
+        )
         return {
             "city": city,
             "canonical_name": geocode["canonical_name"],
             "country_code": country.lower(),
             "lat": geocode["lat"],
             "lon": geocode["lon"],
-            "radius_km": cfg.region.city.radius_km,
+            "radius_km": effective_radius,
             "institutions": institutions,
         }
     except ValueError as e:

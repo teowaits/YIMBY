@@ -219,6 +219,11 @@ def serve_cmd(
 def init_city_cmd(
     city: str = typer.Option(..., "--city", help="City name (e.g. Madrid)"),
     country: str = typer.Option(..., "--country", help="ISO 2-letter country code (e.g. ES)"),
+    radius: float | None = typer.Option(
+        None,
+        "--radius",
+        help="Search radius in km (overrides config radius_km). Default: value from config (30 km).",
+    ),
     config: Path = typer.Option(
         Path("config.yaml"),
         "--config",
@@ -236,7 +241,7 @@ def init_city_cmd(
     """Resolve OpenAlex institution IDs for a city."""
     from regional_scout.city import init_city
 
-    init_city(config, city=city, country=country, write=write)
+    init_city(config, city=city, country=country, write=write, radius=radius)
 
 
 @app.command("init-portfolio")

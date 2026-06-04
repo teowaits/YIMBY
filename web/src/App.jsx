@@ -11,7 +11,36 @@ import {
 import { C, ghostBtn, selectStyle } from "./constants.js";
 import RegionSelector from "./components/RegionSelector.jsx";
 import ShortlistTable from "./components/ShortlistTable.jsx";
+import InfoTooltip from "./components/InfoTooltip.jsx";
 import { ProgressBar, Spinner } from "./components/shared.jsx";
+
+const RUN_PARAM_TOOLTIPS = {
+  maxCandidates:
+    "Maximum author records fetched from OpenAlex before scoring.\nLarger pool = better recall but higher API credit cost.\nCredits used ≈ max_candidates × 10 (works fetch) + max_candidates × 10 (Wiley check).\nFor trip mode (top 10 results), 100–200 is sufficient.\nReduce if approaching your daily credit limit.",
+  workWindow:
+    "Publications older than this window are excluded from all scoring.\nDefault 5 years covers recent output without penalising productive mid-career researchers.\nReduce to 3 for fast-moving fields; extend to 8–10 for fields with slow publication cycles or if scouting senior researchers.",
+  shortlistSize:
+    "Number of top-ranked candidates in the final output.\nDoes not affect how many are scored — only how many appear in results.\nTrip mode: 10. Special-issue scouting: 25–50.",
+  minInScope:
+    "Candidates with fewer in-scope works than this threshold are excluded before scoring. Default 1 includes anyone with at least one relevant paper.\nRaise to 3–5 to focus on established contributors to the field.\nSetting this too high will shrink the pool for niche topics or new fields.",
+};
+
+function ParamLabel({ children, tooltip }) {
+  return (
+    <span
+      style={{
+        display: "flex",
+        alignItems: "center",
+        marginBottom: 6,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+      }}
+    >
+      {children}
+      <InfoTooltip text={tooltip} />
+    </span>
+  );
+}
 
 export default function App() {
   const [settings, setSettings] = useState(null);
@@ -312,16 +341,9 @@ export default function App() {
                 <RegionSelector disabled={isRunning} onChange={setRegionOverrides} />
 
                 <label style={{ fontSize: 11, color: C.textMuted }}>
-                  <span
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
+                  <ParamLabel tooltip={RUN_PARAM_TOOLTIPS.maxCandidates}>
                     Max candidates
-                  </span>
+                  </ParamLabel>
                   <select
                     style={selectStyle}
                     value={maxCandidates}
@@ -337,16 +359,9 @@ export default function App() {
                 </label>
 
                 <label style={{ fontSize: 11, color: C.textMuted }}>
-                  <span
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
+                  <ParamLabel tooltip={RUN_PARAM_TOOLTIPS.workWindow}>
                     Work window (years)
-                  </span>
+                  </ParamLabel>
                   <select
                     style={selectStyle}
                     value={workWindow}
@@ -362,16 +377,9 @@ export default function App() {
                 </label>
 
                 <label style={{ fontSize: 11, color: C.textMuted }}>
-                  <span
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
+                  <ParamLabel tooltip={RUN_PARAM_TOOLTIPS.shortlistSize}>
                     Shortlist size
-                  </span>
+                  </ParamLabel>
                   <select
                     style={selectStyle}
                     value={shortlistSize}
@@ -387,16 +395,9 @@ export default function App() {
                 </label>
 
                 <label style={{ fontSize: 11, color: C.textMuted }}>
-                  <span
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
+                  <ParamLabel tooltip={RUN_PARAM_TOOLTIPS.minInScope}>
                     Min in-scope works
-                  </span>
+                  </ParamLabel>
                   <select
                     style={selectStyle}
                     value={minInScope}

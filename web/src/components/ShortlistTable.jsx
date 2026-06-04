@@ -1,7 +1,31 @@
 import { useState } from "react";
 import { C } from "../constants.js";
+import InfoTooltip from "./InfoTooltip.jsx";
 
-function ScoreBar({ label, value, color }) {
+const TOOLTIPS = {
+  score:
+    "Composite score (0–1), normalised within this candidate pool.\nWeighted sum: Relevance 35% · Productivity 20% · Impact 25% · Network Centrality 15%.\nScores are relative to this pool, not absolute across runs.",
+  inScope:
+    "Count of works in the scoring window whose primary OpenAlex topic matches the journal scope vector.\nHigh count = broad output in field — not a quality signal.\nExpand the card and click work titles to verify topical fit.",
+  fwci:
+    "Field-Weighted Citation Impact — mean across in-scope works only.\n1.0 = field average · >1.0 = above average.\n⚠ OpenAlex FWCI reads ~15–20% higher than SciVal/Scopus.\nCompare values within this list only.",
+  breakdown:
+    "Rel = topic overlap with scope vector (fraction of recent works matching).\nProd = in-scope work count, recency-decayed (recent papers weighted more).\nImp = normalised mean FWCI across in-scope works.\nBars show normalised values within this pool; % = per-author score.",
+  rel: "Fraction of recent works matching the scope topic set.\n100% = all recent works match.",
+  prod: "In-scope work count, recency-decayed.\nRecent papers count more than older ones (half-life ~3 yrs).",
+  imp: "Normalised mean FWCI across in-scope works.\nFew highly-cited works can outscore many average-impact ones.",
+};
+
+function HeaderCell({ children, tooltip }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 0 }}>
+      {children}
+      {tooltip ? <InfoTooltip text={tooltip} /> : null}
+    </span>
+  );
+}
+
+function ScoreBar({ label, value, color, tooltip }) {
   const pct = Math.round((value || 0) * 100);
   return (
     <div style={{ marginBottom: 4 }}>
@@ -14,7 +38,10 @@ function ScoreBar({ label, value, color }) {
           marginBottom: 2,
         }}
       >
-        <span>{label}</span>
+        <span style={{ display: "inline-flex", alignItems: "center" }}>
+          {label}
+          {tooltip ? <InfoTooltip text={tooltip} /> : null}
+        </span>
         <span>{pct}%</span>
       </div>
       <div
@@ -89,12 +116,14 @@ export default function ShortlistTable({ doc }) {
       >
         <span>#</span>
         <span>Researcher</span>
-        <span>Score</span>
-        <span>In-scope</span>
-        <span className="hide-mobile" title="OpenAlex FWCI may read ~15–20% higher than SciVal/Scopus">
-          FWCI
+        <HeaderCell tooltip={TOOLTIPS.score}>Score</HeaderCell>
+        <HeaderCell tooltip={TOOLTIPS.inScope}>In-scope</HeaderCell>
+        <span className="hide-mobile">
+          <HeaderCell tooltip={TOOLTIPS.fwci}>FWCI</HeaderCell>
         </span>
-        <span className="hide-mobile">Breakdown</span>
+        <span className="hide-mobile">
+          <HeaderCell tooltip={TOOLTIPS.breakdown}>Breakdown</HeaderCell>
+        </span>
       </div>
 
       {rows.map((row) => {
@@ -105,9 +134,7 @@ export default function ShortlistTable({ doc }) {
           <div key={row.openalex_id}>
             <div
               className="shortlist-grid-row"
-              onClick={() =>
-                setExpanded(open ? null : row.openalex_id)
-              }
+              onClick={() => setExpanded(open ? null : row.openalex_id)}
               style={{
                 display: "grid",
                 gridTemplateColumns: "32px 1.4fr 72px 72px 72px 1fr",
@@ -145,9 +172,9 @@ export default function ShortlistTable({ doc }) {
                 {row.mean_fwci != null ? row.mean_fwci.toFixed(1) : "—"}
               </span>
               <div className="hide-mobile" style={{ fontSize: 10 }}>
-                <ScoreBar label="Rel" value={b.relevance} color={C.blue} />
-                <ScoreBar label="Prod" value={b.productivity} color={C.amber} />
-                <ScoreBar label="Imp" value={b.impact} color={C.green} />
+                <ScoreBar label="Rel" value={b.relevance} color={C.blue} tooltip={TOOLTIPS.rel} />
+                <ScoreBar label="Prod" value={b.productivity} color={C.amber} tooltip={TOOLTIPS.prod} />
+                <ScoreBar label="Imp" value={b.impact} color={C.green} tooltip={TOOLTIPS.imp} />
               </div>
             </div>
 

@@ -42,8 +42,11 @@ export function listRuns() {
   return apiFetch("/api/runs");
 }
 
-export function getInitCity(city, country) {
+export function getInitCity(city, country, radius) {
   const params = new URLSearchParams({ city, country });
+  if (radius != null && radius !== "") {
+    params.set("radius", String(radius));
+  }
   return apiFetch(`/api/init-city?${params}`);
 }
 
