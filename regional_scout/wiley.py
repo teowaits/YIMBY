@@ -1,4 +1,4 @@
-"""Live OpenAlex Wiley portfolio signal."""
+"""Live OpenAlex Wiley AI/Comp portfolio signal."""
 
 from __future__ import annotations
 

@@ -77,8 +77,8 @@ function WileyPill({ count, journal }) {
   const label = count === 1 ? "work" : "works";
   const journalPart = journal ? ` · ${journal}` : "";
   return (
-    <span style={wileyPillStyle}>
-      {count} {label}
+    <span style={wileyPillStyle} title="Wiley AI/Comp portfolio">
+      AI/Comp · {count} {label}
       {journalPart}
     </span>
   );
@@ -281,20 +281,20 @@ export default function ShortlistTable({ doc }) {
                 )}
                 {(row.wiley_count ?? 0) > 0 ? (
                   <div style={{ marginTop: 6, fontSize: "0.75rem", color: C.textMuted }}>
-                    Wiley portfolio
+                    Wiley AI/Comp portfolio
                     {wileyWindowLabel ? ` (${wileyWindowLabel})` : ""}:
                     <span style={{ color: C.textPrimary, marginLeft: 4 }}>
                       {row.wiley_count} {row.wiley_count === 1 ? "work" : "works"}
                       {row.wiley_journal
                         ? ` in ${row.wiley_journal}`
                         : row.wiley_friendly
-                          ? " in Wiley portfolio"
+                          ? " in Wiley AI/Comp portfolio"
                           : ""}
                     </span>
                   </div>
                 ) : (
                   <div style={{ marginTop: 6, fontSize: "0.75rem", color: C.textMuted }}>
-                    No Wiley portfolio publications in window
+                    No Wiley AI/Comp portfolio publications in window
                   </div>
                 )}
                 {(row.in_scope_works || []).length > 0 && (

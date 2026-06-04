@@ -97,7 +97,7 @@ footer {
       <th>In-scope</th>
       <th>Breakdown</th>
       <th><span class="tooltip" title="OpenAlex FWCI may read ~15–20% higher than SciVal/Scopus">FWCI</span></th>
-      <th>Wiley</th>
+      <th><span class="tooltip" title="Wiley AI/Comp portfolio">AI/Comp</span></th>
     </tr>
   </thead>
   <tbody>
@@ -152,7 +152,7 @@ footer {
 </main>
 <footer>
   {% if enrich_meta %}
-  Wiley check: <strong>{{ enrich_meta.target_journal_name }}</strong> (OpenAlex source {{ enrich_meta.target_source_id }}). Match key: <code>openalex_id</code>.
+  Wiley AI/Comp check: <strong>{{ enrich_meta.target_journal_name }}</strong> (OpenAlex source {{ enrich_meta.target_source_id }}). Match key: <code>openalex_id</code>.
   {% else %}
   Run <code>shortlist.json</code> through <strong>published-with-us</strong> or enable <code>output.auto_enrich</code> (matches on <code>openalex_id</code>).
   {% endif %}

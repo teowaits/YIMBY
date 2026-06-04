@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 FilterType = Literal["ror", "institution", "country"]
 
+WILEY_PORTFOLIO_DISPLAY_LABEL = "Wiley AI/Comp portfolio"
+WILEY_PORTFOLIO_PILL_LABEL = "AI/Comp"
+
 # ISSN → config key for init-portfolio
 PORTFOLIO_ISSNS: dict[str, str] = {
     "advanced_science": "2198-3844",
@@ -21,6 +24,8 @@ PORTFOLIO_ISSNS: dict[str, str] = {
     "advanced_robotics_research": "2943-9973",
     "advanced_theory_simulations": "2513-0390",
     "advanced_computing": "3054-100X",
+    "applied_ai_letters": "2689-5595",
+    "ijis": "1098-111X",
 }
 
 PORTFOLIO_DISPLAY_NAMES: dict[str, str] = {
@@ -30,6 +35,8 @@ PORTFOLIO_DISPLAY_NAMES: dict[str, str] = {
     "advanced_robotics_research": "Advanced Robotics Research",
     "advanced_theory_simulations": "Advanced Theory and Simulations",
     "advanced_computing": "Advanced Computing",
+    "applied_ai_letters": "Applied AI Letters",
+    "ijis": "International Journal of Intelligent Systems",
 }
 
 
@@ -170,6 +177,8 @@ class WileyPortfolioConfig(BaseModel):
     advanced_robotics_research: str | None = None
     advanced_theory_simulations: str | None = None
     advanced_computing: str | None = None
+    applied_ai_letters: str | None = None
+    ijis: str | None = None
 
     def portfolio_source_ids(self) -> list[str]:
         ids: list[str] = []

@@ -260,7 +260,7 @@ def init_portfolio_cmd(
         help="Update config.yaml in place (preserves comments via ruamel.yaml)",
     ),
 ) -> None:
-    """Resolve missing Wiley portfolio OpenAlex source IDs from ISSNs."""
+    """Resolve missing Wiley AI/Comp portfolio OpenAlex source IDs from ISSNs."""
     from regional_scout.portfolio import init_portfolio
 
     init_portfolio(config, write=write)

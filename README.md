@@ -169,7 +169,7 @@ Changes on `main` since the last push to `origin` (not yet on GitHub):
 **Shortlist enrichment** (`72c20f7`)
 - Works in `shortlist.json` now include `doi` and `source_display_name`
 - `check_wiley_signal()` returns `wiley_count` (portfolio publications in the scoring window), serialized as `wiley_count` on each shortlist row
-- Web shortlist: clickable work titles (DOI → OpenAlex fallback), journal name instead of per-work FWCI, Wiley portfolio pill and expanded detail
+- Web shortlist: clickable work titles (DOI → OpenAlex fallback), journal name instead of per-work FWCI, Wiley AI/Comp portfolio pill and expanded detail
 
 **Web UI — tooltips & city resolution** (`69a354a`)
 - `InfoTooltip` on Run Scout parameters (max candidates, work window, shortlist size, min in-scope works) and shortlist columns (Score, In-scope, FWCI, Breakdown, Rel/Prod/Imp)

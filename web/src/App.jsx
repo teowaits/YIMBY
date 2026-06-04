@@ -16,7 +16,7 @@ import { ProgressBar, Spinner } from "./components/shared.jsx";
 
 const RUN_PARAM_TOOLTIPS = {
   maxCandidates:
-    "Maximum author records fetched from OpenAlex before scoring.\nLarger pool = better recall but higher API credit cost.\nCredits used ≈ max_candidates × 10 (works fetch) + max_candidates × 10 (Wiley check).\nFor trip mode (top 10 results), 100–200 is sufficient.\nReduce if approaching your daily credit limit.",
+    "Maximum author records fetched from OpenAlex before scoring.\nLarger pool = better recall but higher API credit cost.\nCredits used ≈ max_candidates × 10 (works fetch) + max_candidates × 10 (Wiley AI/Comp portfolio check).\nFor trip mode (top 10 results), 100–200 is sufficient.\nReduce if approaching your daily credit limit.",
   workWindow:
     "Publications older than this window are excluded from all scoring.\nDefault 5 years covers recent output without penalising productive mid-career researchers.\nReduce to 3 for fast-moving fields; extend to 8–10 for fields with slow publication cycles or if scouting senior researchers.",
   shortlistSize:
@@ -564,7 +564,7 @@ export default function App() {
                 Rank regional researchers for AI×science editorial scouting
               </div>
               <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.7 }}>
-                Scope from Wiley portfolio journals, score by relevance, productivity, impact, and
+                Scope from Wiley AI/Comp portfolio journals, score by relevance, productivity, impact, and
                 co-author centrality. API key stays on the server via{" "}
                 <code style={{ color: C.textSecondary }}>config.local.yaml</code>.
               </div>

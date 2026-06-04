@@ -41,6 +41,9 @@ scope:
   additional_topic_ids: []
 
 wiley_portfolio:
+  # Wiley AI/Comp portfolio — journals checked for the Wiley signal.
+  # Internal key stays 'wiley_portfolio' for JSON/config compatibility.
+  # Display label: "Wiley AI/Comp portfolio"
   always_check: false
   advanced_intelligent_systems: "S4210212817"
   advanced_intelligent_discovery: "S5407036554"
@@ -48,6 +51,8 @@ wiley_portfolio:
   advanced_robotics_research: null
   advanced_theory_simulations: null
   advanced_computing: null
+  applied_ai_letters: "S4210202348"   # ISSN 2689-5595
+  ijis: "S57950554"                   # ISSN 1098-111X / 0884-8173
 
 output:
   shortlist_size: 10
