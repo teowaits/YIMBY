@@ -9,10 +9,7 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from regional_scout.config import (
-    WILEY_PORTFOLIO_DISPLAY_LABEL,
-    load_config,
-)
+from regional_scout.config import load_config
 from regional_scout.openalex import OpenAlexClient
 from regional_scout.openalex import openalex_id as norm_id
 
@@ -48,6 +45,7 @@ PORTFOLIO_JOURNALS: list[dict[str, Any]] = [
 ]
 
 IJIS_DISPLAY_SHORT = "Int. Journal of Intelligent Systems"
+ATS_DISPLAY_SHORT = "Advanced Theory and Sims"
 
 
 @dataclass
@@ -76,7 +74,7 @@ def _issn_label(entry: dict[str, Any]) -> str:
 def _lookup_source_by_issn(client: OpenAlexClient, issn: str) -> dict[str, Any] | None:
     rows = client.fetch_list(
         "/sources",
-        {"filter": f"issn:{issn}", "select": "id,display_name,works_count", "per-page": "5"},
+        {"filter": f"issn:{issn}", "select": "id,display_name,issn_l,works_count", "per-page": "5"},
         max_pages=1,
     )
     return rows[0] if rows else None
@@ -126,13 +124,20 @@ def _resolve_journal(
 
 
 def _format_row(display: str, result: ResolvedJournal) -> str:
-    name = display if display != PORTFOLIO_JOURNALS[-1]["display"] else IJIS_DISPLAY_SHORT
+    if display == PORTFOLIO_JOURNALS[-1]["display"]:
+        name = IJIS_DISPLAY_SHORT
+    elif display == "Advanced Theory and Simulations":
+        name = ATS_DISPLAY_SHORT
+    else:
+        name = display
     name_col = f"{name:<42}"
     if result.source_id:
         status = "(already set)" if result.already_set else "✓"
         if result.discontinued_warning:
             status = "⚠ discontinued?"
         return f"  {name_col} → {result.source_id:<14} {status}"
+    if result.key == "advanced_computing":
+        return f"  {name_col} → not found in OpenAlex (ISSN {result.issn_label})"
     return f"  {name_col} → not found (ISSN {result.issn_label})"
 
 
@@ -143,7 +148,7 @@ def init_portfolio(config_path: Path, *, write: bool = False) -> None:
         results: list[ResolvedJournal] = []
         updates: dict[str, str] = {}
 
-        print(f"{WILEY_PORTFOLIO_DISPLAY_LABEL} — source IDs resolved:", file=sys.stderr)
+        print("Portfolio source IDs resolved:", file=sys.stderr)
 
         for entry in PORTFOLIO_JOURNALS:
             key = entry["key"]
@@ -173,6 +178,12 @@ def init_portfolio(config_path: Path, *, write: bool = False) -> None:
                 already_set = False
                 if sid:
                     updates[key] = sid
+                elif key == "advanced_computing":
+                    print(
+                        f"WARNING: Advanced Computing not found in OpenAlex "
+                        f"(ISSN {issn_label}) — leaving null.",
+                        file=sys.stderr,
+                    )
 
             result = ResolvedJournal(
                 key=key,

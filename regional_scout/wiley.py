@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from regional_scout.config import Config
 from regional_scout.openalex import OpenAlexClient, openalex_id
+
+logger = logging.getLogger(__name__)
 
 
 def check_wiley_signal(
@@ -17,12 +21,18 @@ def check_wiley_signal(
     One list call per author (10 credits).
     Returns (is_friendly, journal_display_name, count_in_window).
     """
-    if not portfolio_source_ids:
+    source_ids = [sid for sid in portfolio_source_ids if sid]
+    if not source_ids:
+        logger.warning(
+            "wiley_portfolio has no resolved source IDs — "
+            "run init-portfolio to resolve them. "
+            "Wiley signal will be False for all candidates."
+        )
         return False, None, 0
 
     aid = openalex_id(author_id)
     y0, y1 = window
-    sources = "|".join(portfolio_source_ids)
+    sources = "|".join(source_ids)
     filt = (
         f"authorships.author.id:{aid},"
         f"primary_location.source.id:{sources},"
