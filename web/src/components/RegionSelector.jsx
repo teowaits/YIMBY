@@ -40,6 +40,7 @@ export default function RegionSelector({ disabled, onChange }) {
   const [checked, setChecked] = useState({});
   const [resolvePhase, setResolvePhase] = useState("idle");
   const [resolveError, setResolveError] = useState("");
+  const [geocodeMeta, setGeocodeMeta] = useState(null);
   const [confirmedCity, setConfirmedCity] = useState(null);
   const [manualIds, setManualIds] = useState("");
 
@@ -89,12 +90,36 @@ export default function RegionSelector({ disabled, onChange }) {
     if (mode === "country") emit({ country_codes: codes });
   };
 
+  const formatCoords = (lat, lon) => {
+    const latStr = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"}`;
+    const lonStr = `${Math.abs(lon).toFixed(2)}°${lon >= 0 ? "E" : "W"}`;
+    return `${latStr}, ${lonStr}`;
+  };
+
+  const cityChipLabel = (meta) => {
+    if (meta?.canonical_name) {
+      const parts = meta.canonical_name.split(",").map((s) => s.trim());
+      if (parts.length >= 2) return `${parts[0]}, ${parts[parts.length - 1]}`;
+      return meta.canonical_name;
+    }
+    return `${meta?.city_name || ""}, ${(meta?.city_country_code || "").toUpperCase()}`;
+  };
+
   const handleResolve = async () => {
     if (!cityName.trim()) return;
     setResolvePhase("loading");
     setResolveError("");
+    setGeocodeMeta(null);
     try {
       const data = await getInitCity(cityName.trim(), cityCountry);
+      setGeocodeMeta({
+        city: data.city,
+        canonical_name: data.canonical_name,
+        lat: data.lat,
+        lon: data.lon,
+        radius_km: data.radius_km,
+        country_code: data.country_code,
+      });
       setResolved(data.institutions || []);
       const initChecked = {};
       (data.institutions || []).forEach((inst) => {
@@ -114,6 +139,8 @@ export default function RegionSelector({ disabled, onChange }) {
       city_name: cityName.trim(),
       city_country_code: cityCountry,
       institution_ids: ids,
+      canonical_name: geocodeMeta?.canonical_name,
+      radius_km: geocodeMeta?.radius_km,
     };
     setConfirmedCity(payload);
     emit(payload);
@@ -123,6 +150,7 @@ export default function RegionSelector({ disabled, onChange }) {
     setConfirmedCity(null);
     setResolved([]);
     setChecked({});
+    setGeocodeMeta(null);
     emit({});
   };
 
@@ -223,8 +251,8 @@ export default function RegionSelector({ disabled, onChange }) {
               }}
             >
               <span style={{ color: C.blueLight }}>
-                {confirmedCity.city_name}, {confirmedCity.city_country_code.toUpperCase()} —{" "}
-                {confirmedCity.institution_ids.length} institutions
+                {cityChipLabel(confirmedCity)} — {confirmedCity.institution_ids.length} institutions
+                {confirmedCity.radius_km ? ` (${confirmedCity.radius_km} km radius)` : ""}
               </span>
               <button type="button" style={{ ...ghostBtn, padding: "4px 10px", fontSize: 10 }} disabled={disabled} onClick={handleClearCity}>
                 Clear
@@ -280,6 +308,16 @@ export default function RegionSelector({ disabled, onChange }) {
                 </div>
               </div>
               {resolveError && <p style={{ fontSize: 11, color: C.red, marginBottom: 8 }}>{resolveError}</p>}
+              {geocodeMeta && (
+                <p style={{ fontSize: 11, color: C.textMuted, marginBottom: 10, lineHeight: 1.6 }}>
+                  Resolved &apos;{geocodeMeta.city}&apos; → {geocodeMeta.canonical_name} (
+                  {formatCoords(geocodeMeta.lat, geocodeMeta.lon)})
+                  <br />
+                  {resolvePhase === "loading"
+                    ? `Fetching institutions within ${geocodeMeta.radius_km} km…`
+                    : `${resolved.length} institutions within ${geocodeMeta.radius_km} km`}
+                </p>
+              )}
               {resolved.length > 0 && (
                 <div
                   style={{
@@ -311,8 +349,14 @@ export default function RegionSelector({ disabled, onChange }) {
                         onChange={(e) => setChecked((c) => ({ ...c, [inst.id]: e.target.checked }))}
                       />
                       <span>
-                        <strong style={{ color: C.textPrimary }}>{inst.display_name}</strong>
-                        <span style={{ color: C.textMuted }}> ({inst.works_count?.toLocaleString()} works)</span>
+                        <strong style={{ color: C.textPrimary }}>
+                          {inst.name || inst.display_name}
+                        </strong>
+                        <span style={{ color: C.textMuted }}>
+                          {" "}
+                          ({inst.distance_km != null ? `${Number(inst.distance_km).toFixed(1)} km · ` : ""}
+                          {inst.works_count?.toLocaleString()} works)
+                        </span>
                       </span>
                     </label>
                   ))}

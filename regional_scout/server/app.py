@@ -236,18 +236,24 @@ def get_shortlist(run_id: str) -> dict[str, Any]:
 
 @app.get("/api/init-city")
 def init_city_api(city: str, country: str) -> dict[str, Any]:
-    """Resolve institutions for a city (10 credits, cached)."""
+    """Resolve institutions near a city via geocoding + coordinate filter."""
     from regional_scout.city import resolve_city_institutions
 
     cfg = get_base_config()
     client = OpenAlexClient(cfg)
     try:
-        institutions = resolve_city_institutions(client, city, country)
+        institutions, geocode = resolve_city_institutions(client, city, country, cfg)
         return {
             "city": city,
+            "canonical_name": geocode["canonical_name"],
             "country_code": country.lower(),
+            "lat": geocode["lat"],
+            "lon": geocode["lon"],
+            "radius_km": cfg.region.city.radius_km,
             "institutions": institutions,
         }
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
     finally:
         client.close()
 
