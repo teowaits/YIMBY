@@ -111,6 +111,7 @@ def normalize_and_composite(
     mean_fwcis: dict[str, float | None],
     wiley_flags: dict[str, bool],
     wiley_journals: dict[str, str | None],
+    wiley_counts: dict[str, int],
     config: Config,
 ) -> list[ScoredAuthor]:
     if not all_raw:
@@ -160,6 +161,7 @@ def normalize_and_composite(
                 breakdown=breakdown,
                 wiley_friendly=wiley_flags.get(raw.openalex_id, False),
                 wiley_journal=wiley_journals.get(raw.openalex_id),
+                wiley_count=wiley_counts.get(raw.openalex_id, 0),
                 in_scope_work_count=works_counts.get(raw.openalex_id, 0),
                 mean_fwci=mean_fwcis.get(raw.openalex_id),
             )

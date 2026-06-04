@@ -12,7 +12,11 @@ from regional_scout.openalex_parse import parse_work
 logger = logging.getLogger(__name__)
 
 MAX_TOPIC_BATCH = 50
-WORK_SELECT = "id,title,publication_year,primary_topic,primary_location,authorships,fwci"
+WORK_SELECT = (
+    "id,title,doi,publication_year,"
+    "primary_topic,primary_location,"
+    "authorships,fwci"
+)
 
 
 def _year_filter(config: Config) -> str:

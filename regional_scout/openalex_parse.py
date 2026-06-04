@@ -48,12 +48,19 @@ def parse_work(raw: dict[str, Any]) -> WorkRecord:
     if raw.get("fwci") is not None:
         fwci = float(raw["fwci"])
 
+    doi_raw = raw.get("doi")
+    doi = None
+    if isinstance(doi_raw, str):
+        doi = doi_raw.removeprefix("https://doi.org/")
+
     return WorkRecord(
         openalex_id=openalex_id(raw["id"]),
         title=raw.get("title") or raw.get("display_name") or "",
         publication_year=int(raw.get("publication_year") or 0),
         primary_topic_id=openalex_id(topic["id"]) if topic.get("id") else None,
         primary_source_id=openalex_id(source["id"]) if source.get("id") else None,
+        doi=doi,
+        source_display_name=source.get("display_name"),
         fwci=fwci,
         coauthor_ids=coauthors,
     )

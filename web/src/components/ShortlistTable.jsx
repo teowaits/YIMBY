@@ -25,6 +25,65 @@ function HeaderCell({ children, tooltip }) {
   );
 }
 
+const workLinkBase = {
+  color: C.blue,
+  textDecoration: "none",
+  // TODO: replace with design-token rgba when --accent-rgb exists
+  borderBottom: "1px solid rgba(99, 179, 237, 0.3)",
+  transition: "border-color 0.15s",
+};
+
+const workLinkHover = {
+  borderBottomColor: C.blue,
+};
+
+function WorkLink({ work }) {
+  const href = work.doi
+    ? `https://doi.org/${work.doi}`
+    : work.openalex_id
+      ? `https://openalex.org/${work.openalex_id}`
+      : null;
+
+  if (!href) return <span>{work.title}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={workLinkBase}
+      onMouseEnter={(e) => Object.assign(e.currentTarget.style, workLinkHover)}
+      onMouseLeave={(e) => Object.assign(e.currentTarget.style, workLinkBase)}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {work.title}
+    </a>
+  );
+}
+
+const wileyPillStyle = {
+  display: "inline-block",
+  marginTop: 4,
+  fontSize: "0.68rem",
+  color: C.greenDark,
+  background: "rgba(104, 211, 145, 0.12)",
+  border: "1px solid rgba(104, 211, 145, 0.3)",
+  borderRadius: 4,
+  padding: "1px 6px",
+  whiteSpace: "nowrap",
+};
+
+function WileyPill({ count, journal }) {
+  if (!count || count <= 0) return null;
+  const label = count === 1 ? "work" : "works";
+  const journalPart = journal ? ` · ${journal}` : "";
+  return (
+    <span style={wileyPillStyle}>
+      {count} {label}
+      {journalPart}
+    </span>
+  );
+}
+
 function ScoreBar({ label, value, color, tooltip }) {
   const pct = Math.round((value || 0) * 100);
   return (
@@ -69,6 +128,11 @@ export default function ShortlistTable({ doc }) {
   const [expanded, setExpanded] = useState(null);
   const rows = doc?.shortlist || [];
   const enrich = doc?.published_with_us;
+  const yearWindow = doc?.publication_year_window;
+  const wileyWindowLabel =
+    yearWindow?.from != null && yearWindow?.to != null
+      ? `${yearWindow.from}–${yearWindow.to}`
+      : null;
 
   if (!rows.length) {
     return (
@@ -154,6 +218,7 @@ export default function ShortlistTable({ doc }) {
                 <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>
                   {row.institution_name || "—"}
                 </div>
+                <WileyPill count={row.wiley_count} journal={row.wiley_journal} />
                 <div style={{ fontSize: 10, color: C.border2 }}>{row.openalex_id}</div>
               </div>
               <span
@@ -201,13 +266,35 @@ export default function ShortlistTable({ doc }) {
                     </span>
                     {pwu.latest_work && (
                       <div style={{ marginTop: 4, color: C.textMuted }}>
-                        Latest: <em style={{ color: C.textPrimary }}>{pwu.latest_work.title}</em>
-                        {pwu.latest_work.source_display_name &&
-                          ` · ${pwu.latest_work.source_display_name}`}
+                        Latest: <WorkLink work={pwu.latest_work} />
+                        {pwu.latest_work.source_display_name && (
+                          <span style={{ fontStyle: "italic" }}>
+                            {" "}
+                            · {pwu.latest_work.source_display_name}
+                          </span>
+                        )}
                         {pwu.latest_work.publication_year &&
                           ` (${pwu.latest_work.publication_year})`}
                       </div>
                     )}
+                  </div>
+                )}
+                {(row.wiley_count ?? 0) > 0 ? (
+                  <div style={{ marginTop: 6, fontSize: "0.75rem", color: C.textMuted }}>
+                    Wiley portfolio
+                    {wileyWindowLabel ? ` (${wileyWindowLabel})` : ""}:
+                    <span style={{ color: C.textPrimary, marginLeft: 4 }}>
+                      {row.wiley_count} {row.wiley_count === 1 ? "work" : "works"}
+                      {row.wiley_journal
+                        ? ` in ${row.wiley_journal}`
+                        : row.wiley_friendly
+                          ? " in Wiley portfolio"
+                          : ""}
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 6, fontSize: "0.75rem", color: C.textMuted }}>
+                    No Wiley portfolio publications in window
                   </div>
                 )}
                 {(row.in_scope_works || []).length > 0 && (
@@ -226,8 +313,15 @@ export default function ShortlistTable({ doc }) {
                     <ul style={{ paddingLeft: 16, margin: 0 }}>
                       {row.in_scope_works.map((w) => (
                         <li key={w.openalex_id || w.title} style={{ marginBottom: 4 }}>
-                          {w.publication_year} · {w.title}
-                          {w.fwci != null && ` (FWCI ${w.fwci})`}
+                          {w.publication_year}
+                          {" · "}
+                          <WorkLink work={w} />
+                          {w.source_display_name && (
+                            <span style={{ color: C.textMuted, fontStyle: "italic" }}>
+                              {" · "}
+                              {w.source_display_name}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>

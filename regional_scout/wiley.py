@@ -12,13 +12,13 @@ def check_wiley_signal(
     portfolio_source_ids: list[str],
     window: tuple[int, int],
     config: Config,
-) -> tuple[bool, str | None]:
+) -> tuple[bool, str | None, int]:
     """
     One list call per author (10 credits).
-    Returns (is_friendly, journal_display_name_if_found).
+    Returns (is_friendly, journal_display_name, count_in_window).
     """
     if not portfolio_source_ids:
-        return False, None
+        return False, None, 0
 
     aid = openalex_id(author_id)
     y0, y1 = window
@@ -38,14 +38,15 @@ def check_wiley_signal(
         },
     )
     meta = data.get("meta") or {}
-    if int(meta.get("count") or 0) <= 0:
-        return False, None
+    count = int(meta.get("count") or 0)
+    if count <= 0:
+        return False, None, 0
 
     results = data.get("results") or []
     if not results:
-        return True, None
+        return True, None, count
 
     loc = results[0].get("primary_location") or {}
     source = loc.get("source") or {}
     name = source.get("display_name")
-    return True, name
+    return True, name, count

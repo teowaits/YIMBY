@@ -18,6 +18,7 @@ def _scored() -> ScoredAuthor:
         breakdown=ScoreBreakdown(0.5, 0.5, 0.5, 0.5, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
         wiley_friendly=False,
         wiley_journal=None,
+        wiley_count=0,
         in_scope_work_count=2,
         mean_fwci=1.2,
     )

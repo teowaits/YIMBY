@@ -32,6 +32,8 @@ class WorkRecord:
     primary_source_id: str | None
     fwci: float | None
     coauthor_ids: list[str] = field(default_factory=list)
+    doi: str | None = None
+    source_display_name: str | None = None
 
     def to_summary_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +42,8 @@ class WorkRecord:
             "publication_year": self.publication_year,
             "primary_topic_id": self.primary_topic_id,
             "primary_source_id": self.primary_source_id,
+            "doi": self.doi,
+            "source_display_name": self.source_display_name,
             "fwci": round(self.fwci, 4) if self.fwci is not None else None,
         }
 
@@ -75,6 +79,7 @@ class ScoredAuthor:
     breakdown: ScoreBreakdown
     wiley_friendly: bool
     wiley_journal: str | None
+    wiley_count: int
     in_scope_work_count: int
     mean_fwci: float | None
 
@@ -93,6 +98,7 @@ class ShortlistEntry:
     in_scope_work_count: int
     mean_fwci: float | None
     cited_by_count: int
+    wiley_count: int = 0
     in_scope_works: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -119,6 +125,7 @@ class ShortlistEntry:
             },
             "wiley_friendly": self.wiley_friendly,
             "wiley_journal": self.wiley_journal,
+            "wiley_count": self.wiley_count,
             "in_scope_work_count": self.in_scope_work_count,
             "mean_fwci": round(self.mean_fwci, 4) if self.mean_fwci is not None else None,
             "cited_by_count": self.cited_by_count,

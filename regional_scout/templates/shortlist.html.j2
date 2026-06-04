@@ -137,7 +137,10 @@ footer {
       <td class="score">{{ row.mean_fwci if row.mean_fwci is not none else "—" }}</td>
       <td>
         {% if row.wiley_friendly %}
-        <span class="wiley-yes">Yes{% if row.wiley_journal %} ({{ row.wiley_journal }}){% endif %}</span>
+        <span class="wiley-yes">
+          {{ row.wiley_count }} {{ "work" if row.wiley_count == 1 else "works" }}
+          {% if row.wiley_journal %} · {{ row.wiley_journal }}{% endif %}
+        </span>
         {% else %}
         <span class="wiley-no">No</span>
         {% endif %}

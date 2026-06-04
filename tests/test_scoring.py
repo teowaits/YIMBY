@@ -49,6 +49,7 @@ def test_single_author_pool_normalized_to_one():
         {"A1": 1.75},
         {"A1": False},
         {"A1": None},
+        {"A1": 0},
         config,
     )
     assert len(scored) == 1
@@ -113,7 +114,8 @@ def test_ties_min_max():
     ]
     scored = normalize_and_composite(
         raws, authors, {"A1": 1, "A2": 1}, {"A1": 1.0, "A2": 1.0},
-        {"A1": False, "A2": False}, {"A1": None, "A2": None}, config,
+        {"A1": False, "A2": False}, {"A1": None, "A2": None},
+        {"A1": 0, "A2": 0}, config,
     )
     for s in scored:
         assert s.breakdown.relevance == pytest.approx(1.0)

@@ -106,6 +106,7 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
         works_map: dict[str, list[WorkRecord]] = {}
         wiley_flags: dict[str, bool] = {}
         wiley_journals: dict[str, str | None] = {}
+        wiley_counts: dict[str, int] = {}
         works_counts: dict[str, int] = {}
         mean_fwcis: dict[str, float | None] = {}
 
@@ -137,7 +138,7 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
 
         for author in eligible:
             if check_wiley:
-                friendly, journal = check_wiley_signal(
+                friendly, journal, wiley_count = check_wiley_signal(
                     client,
                     author.openalex_id,
                     portfolio_ids,
@@ -146,9 +147,11 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
                 )
                 wiley_flags[author.openalex_id] = friendly
                 wiley_journals[author.openalex_id] = journal
+                wiley_counts[author.openalex_id] = wiley_count
             else:
                 wiley_flags[author.openalex_id] = False
                 wiley_journals[author.openalex_id] = None
+                wiley_counts[author.openalex_id] = 0
 
         g = build_coauthor_graph(eligible, works_map)
         centrality = compute_centrality(g)
@@ -175,6 +178,7 @@ def run_pipeline(config: Config) -> list[ScoredAuthor]:
             mean_fwcis,
             wiley_flags,
             wiley_journals,
+            wiley_counts,
             config,
         )
 
