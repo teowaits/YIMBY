@@ -39,8 +39,10 @@ Edit `config.local.yaml` and set your OpenAlex API key ([get one free](https://o
 # Resolve portfolio source IDs (optional, first time)
 uv run regional-scout init-portfolio --config config.local.yaml --write
 
-# Trip mode: resolve Madrid institutions (10 credits, cached)
+# Trip mode: resolve Madrid institutions (geocode + 30 km radius, cached)
 uv run regional-scout init-city --city Madrid --country ES --config config.local.yaml --write
+# Optional: override radius for this run only (not written to config)
+uv run regional-scout init-city --city "Palo Alto" --country US --radius 50 --config config.local.yaml
 
 # Run Italy example (default in config.yaml)
 uv run regional-scout run --config config.local.yaml
@@ -96,7 +98,7 @@ uv run regional-scout serve --config config.local.yaml
 | `estimate` | Credit preflight (no pipeline) |
 | `enrich` | Published-with-us checks |
 | `report` | Regenerate HTML from JSON |
-| `init-city` | Resolve city → OpenAlex institution IDs |
+| `init-city` | Geocode city → institutions within radius (Nominatim + OpenAlex coords) |
 | `init-portfolio` | Resolve journal OpenAlex source IDs |
 | `cache-clear` | Clear SQLite HTTP cache |
 
@@ -117,7 +119,7 @@ Copy `config.yaml` → `config.local.yaml`. Key sections:
 | Section | Settings |
 |---------|----------|
 | `openalex` | `api_key`, `max_credits_per_run`, `work_window_years`, `max_candidates` |
-| `region` | `country_codes` (ISO 2-letter) or `ror_ids` |
+| `region` | `country_codes`, `city.institution_ids`, `city.radius_km`, `city.affiliation_recency_years`, or `ror_ids` |
 | `scoring` | Weights, `min_in_scope_works`, `scope_author_prefilter` |
 | `scope` | Seed DOIs, competitor ISSNs, extra topic IDs |
 | `wiley_portfolio` | OpenAlex source IDs per Advanced journal |
@@ -155,6 +157,33 @@ web/                React + Vite UI
 tests/              pytest suite
 config.yaml         Committed template (no secrets)
 ```
+
+---
+
+## Changelog
+
+Changes on `main` since the last push to `origin` (not yet on GitHub):
+
+### Unreleased (2026-05)
+
+**Shortlist enrichment** (`72c20f7`)
+- Works in `shortlist.json` now include `doi` and `source_display_name`
+- `check_wiley_signal()` returns `wiley_count` (portfolio publications in the scoring window), serialized as `wiley_count` on each shortlist row
+- Web shortlist: clickable work titles (DOI → OpenAlex fallback), journal name instead of per-work FWCI, Wiley portfolio pill and expanded detail
+
+**Web UI — tooltips & city resolution** (`69a354a`)
+- `InfoTooltip` on Run Scout parameters (max candidates, work window, shortlist size, min in-scope works) and shortlist columns (Score, In-scope, FWCI, Breakdown, Rel/Prod/Imp)
+- City mode: Select all / deselect all, distance in institution checklist (`1.2 km · 72,341 works`), configurable radius input
+- `init-city --radius` CLI flag and `GET /api/init-city?radius=` query param (override only; not saved to config)
+
+**init-city rewrite** (`52efad8`)
+- Replaced `display_name.search` with Nominatim geocoding + country institution fetch + haversine filter within `region.city.radius_km` (default 30 km)
+- Finds universities not named after their city (e.g. Stanford from Palo Alto, Yale from New Haven, Università di Milano from Milano)
+- Large countries auto-apply `works_count:>500` pre-filter when fetching institutions
+
+**City candidate pool fix** (`19c136c`)
+- Stopped merging worldwide co-authors from portfolio-works scan into the candidate pool
+- Post-fetch affiliation verification drops authors with only incidental `last_known_institutions` matches (`region.city.affiliation_recency_years`, default 3)
 
 ---
 
